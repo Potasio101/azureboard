@@ -1,186 +1,89 @@
 # Docker Sandbox — Guía `sbx`
 
-## Setup inicial
+`sbx` crea entornos aislados para agentes de IA. El sandbox corre en una microVM separada — los cambios no afectan el host.
+
+---
+
+## Sesión con Claude
 
 ```bash
-# Construir imagen base
-docker build -t sbx .
+# Arrancar Claude en el directorio actual
+sbx run claude .
 
-# Arrancar contenedor
-docker run -it --name sbx sbx bash
-#           │   │          │   └─ comando a ejecutar dentro del contenedor
-#           │   │          └───── imagen a usar (construida arriba)
-#           │   └──────────────── nombre del contenedor (para referenciarlo después)
-#           └──────────────────── -i mantiene stdin abierto, -t asigna terminal (TTY)
+# Retomar un sandbox existente
+sbx run <sandbox>
+
+# Arrancar Claude desde un template guardado
+sbx run -t <repo>:<tag> claude .
 ```
 
 ---
 
-## Snapshots (guardar estado)
-
-### Guardar snapshot
+## Comandos de uso diario
 
 ```bash
-docker commit sbx sbx:snap-<nombre>
+sbx ls                          # listar sandboxes
+sbx stop <sandbox>              # detener
+sbx rm <sandbox> --force        # eliminar
+sbx exec <sandbox> <cmd>        # ejecutar comando dentro del sandbox
+sbx exec -u root <sandbox> bash # entrar como root
+```
+
+---
+
+## Templates — guardar y reusar entornos
+
+El template guarda el estado del sandbox (con todo lo que instalaste) para poder recrearlo después sin reinstalar nada. Útil cuando borras o recreas el sandbox.
+
+### Flujo completo
+
+**1. Instalar lo que necesitas dentro del sandbox:**
+```bash
+sbx exec -u root <sandbox> bash -c "curl -sL https://aka.ms/InstallAzureCLIDeb | bash"
+sbx exec <sandbox> bash -c "az extension add --name azure-devops"
+```
+
+**2. Detener y guardar como template:**
+```bash
+sbx stop <sandbox>
+sbx template save <sandbox> <repo>:<tag>
 ```
 
 Ejemplo:
+```bash
+sbx template save claude-azureboard azureboard:az-ready
+```
+
+**3. Cuando necesites recrear el sandbox (después de borrarlo):**
+```bash
+sbx rm <sandbox> --force
+sbx run -t <repo>:<tag> claude .
+```
+
+### Gestión de templates
 
 ```bash
-docker commit sbx sbx:snap-antes-de-romper
-```
-
-### Listar snapshots
-
-```bash
-docker images sbx
-```
-
-Output esperado:
-
-```
-REPOSITORY   TAG                  IMAGE ID       CREATED         SIZE
-sbx          snap-antes-de-romper a1b2c3d4e5f6   2 minutes ago   200MB
-sbx          latest               f6e5d4c3b2a1   1 hour ago      198MB
-```
-
-### Restaurar snapshot
-
-```bash
-# Detener y borrar contenedor actual
-docker stop sbx && docker rm sbx
-
-# Arrancar desde snapshot guardado
-docker run -it --name sbx sbx:snap-<nombre> bash
-```
-
-### Exportar snapshot a archivo
-
-```bash
-docker save sbx:snap-<nombre> | gzip > snap-<nombre>.tar.gz
-```
-
-### Importar snapshot desde archivo
-
-```bash
-docker load < snap-<nombre>.tar.gz
+sbx template ls                          # listar templates guardados
+sbx template rm <repo>:<tag>             # borrar template
+sbx template save <sandbox> <tag> --output ./snap.tar   # exportar a archivo
+sbx template load ./snap.tar             # importar desde archivo
 ```
 
 ---
 
-## Setup C# / ASP.NET + Azure
-
-### Opción A — usar imagen oficial de Microsoft (recomendado)
-
-En vez de imagen base genérica, arrancar desde imagen .NET:
+## Copiar archivos
 
 ```bash
-# .NET 8 SDK (incluye compilador, CLI dotnet, ASP.NET runtime)
-docker run -it --name sbx mcr.microsoft.com/dotnet/sdk:8.0 bash
-```
-
-Guardar snapshot limpio inmediatamente:
-
-```bash
-docker commit sbx sbx:snap-dotnet8-base
-```
-
-### Opción B — instalar .NET sobre imagen existente
-
-Dentro del contenedor:
-
-```bash
-# Descargar e instalar .NET 8 SDK
-curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 8.0
-
-# Agregar al PATH
-echo 'export PATH="$HOME/.dotnet:$PATH"' >> ~/.bashrc && source ~/.bashrc
-
-# Verificar
-dotnet --version
-```
-
-### Instalar Azure CLI
-
-```bash
-curl -sL https://aka.ms/InstallAzureCLIDeb | bash
-
-# Verificar
-az --version
-
-# Login
-az login
-```
-
-### Instalar Azure Functions Core Tools
-
-```bash
-npm install -g azure-functions-core-tools@4 --unsafe-perm true
-```
-
-### Instalar extensiones útiles de Azure (via dotnet)
-
-```bash
-# Azure SDK packages - agregar al proyecto
-dotnet add package Azure.Identity
-dotnet add package Azure.Storage.Blobs
-dotnet add package Azure.Messaging.ServiceBus
-dotnet add package Microsoft.Azure.Functions.Worker
-```
-
-### Snapshot después de instalar todo
-
-```bash
-# Salir del contenedor o desde otra terminal
-docker commit sbx sbx:snap-dotnet8-azure-ready
-```
-
-### Flujo recomendado para proyectos ASP.NET
-
-```bash
-# 1. Arrancar desde snapshot limpio
-docker run -it --name sbx sbx:snap-dotnet8-azure-ready bash
-
-# 2. Crear proyecto ASP.NET
-dotnet new webapi -n MiApi && cd MiApi
-
-# 3. Snapshot antes de experimentar
-docker commit sbx sbx:snap-miapi-inicial
-
-# 4. Correr
-dotnet run
+sbx cp ./archivo.json <sandbox>:/home/user/    # host → sandbox
+sbx cp <sandbox>:/home/user/output.log ./      # sandbox → host
 ```
 
 ---
 
-## Flujo típico
+## Templates disponibles en este proyecto
 
-```
-1. sbx corriendo
-2. docker commit sbx sbx:snap-checkpoint-1   # guardar antes de cambio
-3. hacer cambios / experimentos
-4. si todo bien -> docker commit sbx sbx:snap-checkpoint-2
-5. si rompe    -> restaurar snap-checkpoint-1
-```
+| Template | Contiene |
+|---|---|
+| `azureboard:az-ready` | az CLI + extensión azure-devops |
 
----
-
-## Borrar snapshots viejos
-
-```bash
-# Una imagen
-docker rmi sbx:snap-<nombre>
-
-# Todas las dangling
-docker image prune
-```
-
----
-
-## Tips
-
-| Situación | Comando |
-|-----------|---------|
-| Ver diff entre commits | `docker diff sbx` |
-| Ver historial de imagen | `docker history sbx:snap-<nombre>` |
-| Snapshot con timestamp auto | `docker commit sbx sbx:snap-$(date +%Y%m%d-%H%M%S)` |
+Ver [issue-tracker-azuredevops.md](../skills/issue-tracker-azuredevops.md) para los comandos a ejecutar dentro del sandbox.
