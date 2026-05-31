@@ -1,2 +1,6 @@
 .claude/
 .agents/
+
+# Playwright MCP runtime artifacts (snapshots, console logs, test screenshots)
+.playwright-mcp/
+test-playwright.png
