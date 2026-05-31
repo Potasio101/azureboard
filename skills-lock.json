@@ -47,7 +47,7 @@
       "source": "potasio101/azureboard",
       "sourceType": "github",
       "skillPath": "skills/SKILL.md",
-      "computedHash": "6c3bdbd2194d341e1f4e3ae7cecfaa67054cd4dc560813436f0d4b84085c9cd3"
+      "computedHash": "e9bc002dc27ff8218945990376107b67b9be39f7051537f675d2535bd825420c"
     },
     "tdd": {
       "source": "mattpocock/skills",
