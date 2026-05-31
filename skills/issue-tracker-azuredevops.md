@@ -26,7 +26,7 @@ Azure DevOps uses typed work items instead of generic "issues":
 
 | Concept           | ADO type      | Valid states                                         |
 | ----------------- | ------------- | ---------------------------------------------------- |
-| Feature / story   | `Task`*       | _(run setup skill to discover)_                      |
+| Feature / story   | `User Story`  | _(run setup skill to discover)_                      |
 | Bug               | `Bug`         | _(run setup skill to discover)_                      |
 | Task / chore      | `Task`        | _(run setup skill to discover)_                      |
 | Epic / PRD        | `Epic`        | _(run setup skill to discover)_                      |
@@ -76,6 +76,12 @@ The setup skill fills in the correct `<org>` and `<project>` values from `git re
     --assigned-to "user@example.com"   # optional
   ```
   Use `--type Bug`, `--type Task`, or `--type Epic` as appropriate.
+  `--description` maps to `System.Description` (HTML body).
+  For acceptance criteria on User Stories, add:
+  ```bash
+  az boards work-item update --id <id> \
+    --fields "Microsoft.VSTS.Common.AcceptanceCriteria=<html>"
+  ```
 
 - **Read a work item**:
   ```bash
@@ -93,6 +99,14 @@ The setup skill fills in the correct `<org>` and `<project>` values from `git re
     --output json
   ```
   Filter by tag: add `AND [System.Tags] CONTAINS 'ready-for-agent'` to the WHERE clause.
+  Filter by type: add `AND [System.WorkItemType] = 'Bug'` to the WHERE clause.
+
+- **Set Area Path or Iteration (sprint)**:
+  ```bash
+  az boards work-item update --id <id> \
+    --fields "System.AreaPath=<org>\\<project>\\<area>" \
+             "System.IterationPath=<org>\\<project>\\Sprint 1"
+  ```
 
 - **Comment on a work item**:
   ```bash
@@ -106,14 +120,7 @@ The setup skill fills in the correct `<org>` and `<project>` values from `git re
   az boards work-item update --id <id> --fields "System.Tags=${CURRENT}; needs-triage"
   ```
 
-- **Change state** — states vary by process template:
-
-  | Process template | In progress | Complete |
-  | ---------------- | ----------- | -------- |
-  | Basic (default)  | `Doing`     | `Done`   |
-  | Agile            | `Active`    | `Closed` |
-  | Scrum            | `Active`    | `Done`   |
-  | CMMI             | `Active`    | `Closed` |
+- **Change state** — states vary by process template; always fetch them live before using:
 
   ```bash
   # Check which states exist for a type in your project:
