@@ -86,4 +86,4 @@ sbx cp <sandbox>:/home/user/output.log ./      # sandbox → host
 |---|---|
 | `azureboard:az-ready` | az CLI + extensión azure-devops |
 
-Ver [issue-tracker-azuredevops.md](../skills/issue-tracker-azuredevops.md) para los comandos a ejecutar dentro del sandbox.
+
